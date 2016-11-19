@@ -1,0 +1,31 @@
+{
+  "name": "filebrowser",
+  "description": "Open, Crackable File Browser built on Git Electron",
+  "main": "gulpfile.js",
+  "license": "ISC",
+  "homepage": "https://github.com/scott181182/HackOhio2016",
+  "private": true,
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "angular": "^1.5.8",
+    "angular-ui-router": "^0.3.2",
+    "photon": "^0.1.2-alpha"
+  },
+  "overrides": {
+    "photon": {
+      "main": [
+        "dist/css/photon.css",
+        "dist/fonts/photon-entypo.eot",
+        "dist/fonts/photon-entypo.svg",
+        "dist/fonts/photon-entypo.ttf",
+        "dist/fonts/photon-entypo.woff"
+      ]
+    }
+  }
+}
