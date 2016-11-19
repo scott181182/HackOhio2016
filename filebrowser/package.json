@@ -1,0 +1,14 @@
+{
+  "name": "filebrowser",
+  "version": "0.1.0",
+  "description": "Open, Crackable File Browser built on Git Electron",
+  "main": "main.js",
+  "scripts": {
+    "test": "test"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "react": "^15.4.0"
+  }
+}
