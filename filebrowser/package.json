@@ -4,11 +4,21 @@
   "description": "Open, Crackable File Browser built on Git Electron",
   "main": "main.js",
   "scripts": {
-    "test": "test"
+    "test": "test",
+    "compile": "mkdir js; browserify -t [ babelify --presets [ react es2015 ] ] src/app.js -o js/app.js",
+    "start": "electron main.js"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "react": "^15.4.0"
+    "react": "^15.4.0",
+    "react-dom": "^15.4.0"
+  },
+  "devDependencies": {
+    "babel-preset-es2015": "^6.18.0",
+    "babel-preset-react": "^6.16.0",
+    "babelify": "^7.3.0",
+    "browserify": "^13.1.1",
+    "electron-prebuilt": "^1.3.9"
   }
 }
