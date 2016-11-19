@@ -11,6 +11,6 @@
         		process = remote.require('process')
         		;
 
-        	$scope.user = process.env['USER'];
+        	$scope.user = process.env['USER'] || process.env['USERNAME'];
         }]);
 })(angular);
