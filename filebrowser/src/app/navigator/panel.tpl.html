@@ -1,0 +1,17 @@
+<div class="panel-container">
+	<ul class="list-group folder-panel">
+			<li class="list-group-item file-item" ng-class="{ 'active': file.active }"
+					ng-repeat="file in content track by $index"
+					ng-click="activateFile($event); navigate({ fileObj: file })"
+					ng-dblclick="open(file)">
+				<div class="media-body">
+					<p>
+						<i ng-if="file.isDir" class="fa fa-folder-o"></i>
+						<i ng-if="!file.isDir" class="fa" ng-class="getFileIcon(file.ext)"></i>
+						{{file.name}}
+					</p>
+				</div>
+			</li>
+		</a>
+	</ul>
+</div>

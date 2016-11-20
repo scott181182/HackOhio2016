@@ -1,31 +1,24 @@
-<header class="toolbar toolbar-header" style="-webkit-app-region: drag">
+<header class="toolbar toolbar-header" ng-controller="ToolbarController as t">
 
   <div class="toolbar-actions">
-    <div class="btn-group" style="-webkit-app-region: no-drag">
-      <button class="btn btn-default">
-        <span class="icon icon-home"></span>
+    <div class="btn-group">
+      <button class="btn btn-large btn-default" ng-class="{ disabled: undoList.length == 0 }" onclick="console.log" ng-click="goBack()">
+        <span class="icon icon-left"></span>
       </button>
-      <button class="btn btn-default">
-        <span class="icon icon-folder"></span>
+      <button class="btn btn-large btn-default" ng-click="goUp()">
+        <span class="icon icon-up"></span>
       </button>
-      <button class="btn btn-default active">
-        <span class="icon icon-cloud"></span>
-      </button>
-      <button class="btn btn-default">
-        <span class="icon icon-popup"></span>
-      </button>
-      <button class="btn btn-default">
-        <span class="icon icon-shuffle"></span>
+      <button class="btn btn-large btn-default" ng-class="{ disabled: redoList.length == 0 }" ng-click="goForward()">
+        <span class="icon icon-right"></span>
       </button>
     </div>
 
-    <button class="btn btn-default" style="-webkit-app-region: no-drag">
-      <span class="icon icon-home icon-text"></span>
-      Filters
+    <button class="btn btn-large btn-default">
+      <span class="icon icon-folder"></span>
     </button>
 
-    <button class="btn btn-default btn-dropdown pull-right">
-      <span class="icon icon-megaphone"></span>
-    </button>
+    <div id="search-field" class="pull-right">
+      <input type="text" class="form-control" placeholder="search">
+    </div>
   </div>
 </header>

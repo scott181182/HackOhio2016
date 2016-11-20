@@ -37190,7 +37190,9 @@ if (typeof module !== "undefined" && typeof exports !== "undefined" && module.ex
         .module('browser.app', [
             'ui.router',
             'templates.app',
-            'browser.app.navigator'
+            'browser.app.toolbar',
+            'browser.app.navigator',
+            'browser.app.service.fileservice'
         ])
         .config(['$stateProvider', '$urlRouterProvider', function($stateProvider, $urlRouterProvider) {
             $urlRouterProvider.otherwise("/nav/")
@@ -37217,15 +37219,437 @@ if (typeof module !== "undefined" && typeof exports !== "undefined" && module.ex
     "use strict";
 
     ng
-        .module('browser.app.navigator', ['ui.router', 'templates.app'])
-        .controller('NavigateController', ['$scope', '$state', function($scope, $state) {
+        .module('browser.app.navigator', ['ui.router', 'templates.app', 'browser.app.service.fileservice'])
+        .controller('NavigateController', ['$scope', '$rootScope', '$state', '$timeout', 'fileio', function($scope, $rootScope, $state, $timeout, fileio) {
+
+            $scope.home = fileio.getHomeDirectory();
+
+            $scope.user = fileio.getUser();
+            $scope.currdir = $state.params.path || fileio.getHomeDirectory();
+            $scope.dirtree = [$scope.currdir];
+            $scope.currfile = undefined;
+
+            $scope.setTree = function(fileObj, ignore) {
+                $scope.currfile = undefined;
+
+                if (fileObj.isDir) {
+                    console.log('dir...');
+                    if (!ignore) {
+                        console.log('saving...');
+                        console.log($scope.dirtree[$scope.dirtree.length - 1]);
+                        $rootScope.$emit('action', $scope.dirtree[$scope.dirtree.length - 1]);
+                    }
+
+                    var prev = fileObj.path.substring(0, fileObj.path.lastIndexOf(fileio.sep));
+                    if (!prev) {
+                        prev = '/';
+                    }
+                    var index = $scope.dirtree.indexOf(prev);
+                    $scope.dirtree.splice(index + 1, $scope.dirtree.length - index + 1);
+
+                    $scope.dirtree.push(fileObj.path);
+
+                    $timeout(function() {
+                        document.getElementById('navigator-pane').scrollLeft = $scope.dirtree.length * 225;
+                    }, 350);
+
+                } else {
+                    $scope.currfile = fileObj.path;
+                }
+            };
+            $scope.cd = function(path, ignore) {
+                $scope.setTree({
+                    isDir: true,
+                    path: path,
+                }, ignore);
+            }
+
+
+            $rootScope.$on('direction', function(event, cmd, arg) {
+                switch (cmd) {
+                    case 'up':
+                        console.log('Going Up!');
+                        if ($scope.dirtree.length > 1) {
+                            $scope.cd($scope.dirtree[$scope.dirtree.length - 1]);
+                        }
+                        break;
+                    case 'back':
+                        console.log('Going Back!');
+                        $scope.cd(arg, true);
+                        break;
+                    case 'forward':
+                        console.log('Going Forward!');
+                        $scope.cd(arg, true);
+                        break;
+                }
+            });
+        }])
+        .directive('directoryPanel', ['appio', 'fileio', function(appio, fileio) {
+            return {
+                restrict: 'E',
+                scope: {
+                    path: '=',
+                    navigate: '&'
+                },
+                templateUrl: 'navigator/panel.tpl.html',
+                link: function($scope, $element, $attrs) {
+                    var remote = require('electron').remote;
+
+                    var fs = remote.require('fs'),
+                        path = remote.require('path'),
+                        windowManager = remote.require('electron-window-manager');
+
+                    function ls(path) {
+                        return fs.readdirSync(path);
+                    }
+
+                    $scope.open = function(fileObj) {
+                        if (fileObj.isDir) {
+                            console.log(window.location.href + fileObj.path);
+                            windowManager.open(null, 'Open File Browser',
+                                window.location.href + fileObj.path
+                            );
+                        } else {
+                            appio.launch(fileObj.path);
+                        }
+                    }
+
+                    $scope.content = ls($scope.path)
+                        .filter(function(filename) {
+                            return !/(^|\/)\.[^\/\.]/g.test(filename);
+                        })
+                        .map(function(filename) {
+                            var stats = fs.lstatSync(path.join($scope.path, filename));
+                            return {
+                                name: filename,
+                                path: path.join($scope.path, filename),
+                                ext: filename.split('.').pop(),
+                                isDir: stats.isDirectory(),
+                                stats: stats
+                            };
+                        });
+
+                    $scope.activateFile = function($event) {
+                        var $ = require('jquery');
+                        $('#navigator-pane .active').closest('.file-item').removeClass('selected');
+                        $('#navigator-pane .active')
+                            .closest('.file-item')
+                            .filter(function(index, element) {
+                                var filename = $(element).children(":visible").text().trim();
+                                console.log(filename + ' vs ' + $scope.path);
+                                console.log($scope.path.indexOf(filename))
+                                return $scope.path.indexOf(filename) < 0;
+                            })
+                            .removeClass('active');
+                        $($event.toElement).closest('.file-item').addClass('active');
+                        $($event.toElement).closest('.file-item').addClass('selected');
+                    }
+
+                    $scope.getFileIcon = fileio.getFileIcon;
+                }
+            };
+        }])
+        .directive('filePanel', ['fileio', function(fileio) {
+            return {
+                restrict: 'E',
+                scope: {
+                    file: '@'
+                },
+                templateUrl: 'navigator/fileinfo.tpl.html',
+                link: function($scope, $element, $attrs) {
+                    $scope.$watch("file", function(newValue, oldValue) {
+                        if (newValue) {
+                            $scope.info = fileio.fileInfo(newValue);
+                        }
+                    });
+
+                    $scope.info = fileio.fileInfo($scope.file);
+
+                    $scope.previews = {
+
+                    };
+                }
+            }
+        }]);
+})(angular);
+
+(function(ng) {
+    "use strict";
+
+    ng
+        .module('browser.app.service.fileservice', [])
+        .factory('fileio', [function() {
+            var serv = {};
+
             var remote = require('electron').remote;
 
-            var fs = remote.require('fs'),
-                os = remote.require('os'),
+            var pathlib = remote.require('path'),
+                fslib = remote.require('fs'),
                 process = remote.require('process');
 
-            $scope.user = process.env['USER'];
+            serv.sep = pathlib.sep;
+            serv.join = pathlib.join;
+
+
+            serv.ls = function(path) {
+                return fslib.readdirSync(path);
+            };
+            serv.lsl = function(path) {
+                var ret = [];
+
+                var files = serv.ls(path);
+                for (file in files) {
+                    var stat = fslib.lstatSync(pathlib.join(path, file));
+                    var ext = file.contains('.') ? file.split('.').pop() : '';
+                    ret.push({
+                        name: file,
+                        path: pathlib.join(path, file),
+                        ext: ext,
+                        stat: stat
+                    });
+                }
+
+                return ret;
+            };
+
+            serv.stat = function(path) {
+                return fs.lstatSync(path);
+            }
+            serv.fileInfo = function(path) {
+                var filename = path.split(pathlib.sep).pop();
+                var ext = filename.split('.').pop();
+                return {
+                    name: filename,
+                    path: path,
+                    ext: ext,
+                    icon: serv.getFileIcon(ext),
+                    stat: fslib.lstatSync(path)
+                };
+            };
+
+
+            serv.getFileIcon = function(ext) {
+                switch (ext) {
+                    case 'txt':
+                        return 'fa-file-text-o';
+                        break;
+                    case 'pdf':
+                        return 'fa-file-pdf-o';
+                        break;
+                    case 'js':
+                        return 'fa-file-code-o';
+                        break;
+                    case 'png':
+                    case 'jpg':
+                    case 'jpeg':
+                    case 'gif':
+                        return 'fa-file-image-o';
+                        break;
+
+                    default:
+                        return 'fa-file-o';
+                }
+            };
+
+
+
+            serv.getHomeDirectory = function() {
+                return process.env[(process.platform == 'win32') ? 'USERPROFILE' : 'HOME'];
+            }
+            serv.getUser = function() {
+                return process.env['USER'] || process.env['USERNAME'];
+            }
+
+
+
+            return serv;
+        }])
+        .factory('appio', [function() {
+            var serv = {};
+
+            var remote = require('electron').remote;
+
+            var sys = remote.require('sys'),
+                exec = remote.require('child_process').exec,
+                process = remote.require('process');
+
+
+            function launchCmd() {
+                switch (process.platform) {
+                    case 'darwin':
+                        return 'open';
+                    case 'win32':
+                    case 'win64':
+                        return 'start';
+                    default:
+                        return 'xdg-open';
+                }
+            }
+            serv.launch = function(path) {
+                exec(launchCmd() + ' ' + path);
+            }
+
+            return serv;
+        }]);
+
+})(angular);
+
+(function(ng) {
+    "use strict";
+
+    ng
+        .module('browser.app.service.fileservice', [])
+        .factory('fileio', [function() {
+            var serv = {};
+
+            var remote = require('electron').remote;
+
+            var pathlib = remote.require('path'),
+                fslib = remote.require('fs'),
+                process = remote.require('process');
+
+            serv.sep = pathlib.sep;
+            serv.join = pathlib.join;
+
+
+            serv.ls = function(path) {
+                return fslib.readdirSync(path);
+            };
+            serv.lsl = function(path) {
+                var ret = [];
+
+                var files = serv.ls(path);
+                for (file in files) {
+                    var stat = fslib.lstatSync(pathlib.join(path, file));
+                    var ext = file.contains('.') ? file.split('.').pop() : '';
+                    ret.push({
+                        name: file,
+                        path: pathlib.join(path, file),
+                        ext: ext,
+                        stat: stat
+                    });
+                }
+
+                return ret;
+            };
+
+            serv.stat = function(path) {
+                return fs.lstatSync(path);
+            }
+            serv.fileInfo = function(path) {
+                var filename = path.split(pathlib.sep).pop();
+                var ext = filename.split('.').pop();
+                return {
+                    name: filename,
+                    path: path,
+                    ext: ext,
+                    icon: serv.getFileIcon(ext),
+                    stat: fslib.lstatSync(path)
+                };
+            };
+
+
+            serv.getFileIcon = function(ext) {
+                switch (ext) {
+                    case 'txt':
+                        return 'fa-file-text-o';
+                        break;
+                    case 'pdf':
+                        return 'fa-file-pdf-o';
+                        break;
+                    case 'js':
+                        return 'fa-file-code-o';
+                        break;
+                    case 'png':
+                    case 'jpg':
+                    case 'jpeg':
+                    case 'gif':
+                        return 'fa-file-image-o';
+                        break;
+
+                    default:
+                        return 'fa-file-o';
+                }
+            };
+
+
+
+            serv.getHomeDirectory = function() {
+                return process.env[(process.platform == 'win32') ? 'USERPROFILE' : 'HOME'];
+            }
+            serv.getUser = function() {
+                return process.env['USER'] || process.env['USERNAME'];
+            }
+
+
+
+            return serv;
+        }])
+        .factory('appio', [function() {
+            var serv = {};
+
+            var remote = require('electron').remote;
+
+            var sys = remote.require('sys'),
+                exec = remote.require('child_process').exec,
+                process = remote.require('process');
+
+
+            function launchCmd() {
+                switch (process.platform) {
+                    case 'darwin':
+                        return 'open';
+                    case 'win32':
+                    case 'win64':
+                        return 'start';
+                    default:
+                        return 'xdg-open';
+                }
+            }
+            serv.launch = function(path) {
+                exec(launchCmd() + ' ' + path);
+            }
+
+            return serv;
+        }]);
+
+})(angular);
+
+(function(ng) {
+    "use strict";
+
+    ng
+        .module('browser.app.toolbar', ['ui.router', 'templates.app'])
+        .controller('ToolbarController', ['$scope', '$rootScope', function($scope, $rootScope) {
+            console.log("Toolbar loading!");
+
+
+            $scope.undoStack = [];
+            $scope.redoStack = [];
+
+            $scope.goBack = function() {
+                console.log('Back! ' + pop);
+                var pop = $scope.undoStack.pop();
+                $scope.redoStack.push(pop);
+                $rootScope.$emit('direction', 'back', pop);
+            };
+            $scope.goUp = function() {
+                console.log('Up!');
+                $rootScope.$emit('direction', 'up');
+            };
+            $scope.goForward = function() {
+                var pop = $scope.redoStack.pop();
+                console.log('Forward! ' + pop);
+                $rootScope.$emit('direction', 'forward', pop);
+            };
+
+            $rootScope.$on('action', function(event, path) {
+                console.log('Action Taken! ' + path);
+                $scope.undoStack.push(path);
+                console.log($scope.undoStack);
+            });
+
+            console.log("Toolbar loaded!");
         }]);
 })(angular);
 
@@ -37250,36 +37674,122 @@ if (typeof module !== "undefined" && typeof exports !== "undefined" && module.ex
         module = angular.module('templates.app', []);
     }
     module.run(['$templateCache', function($templateCache) {
+        $templateCache.put('navigator/fileinfo.tpl.html',
+            '<div class="file-container">\n' +
+            '	<div class="preview">\n' +
+            '		<h1 ng-if="!previews.hasKey(info.ext)" class="big-icon"><i class="fa" ng-class="info.icon"></i></h1>\n' +
+            '	</div>\n' +
+            '	<h2>{{info.name}}</h2>\n' +
+            '	<p>{{info.path}}</p>\n' +
+            '\n' +
+            '	<div>\n' +
+            '		<dl>\n' +
+            '			<dt>Created:</dt>\n' +
+            '			<dd>{{info.stat.birthtime.toLocaleDateString()}} {{info.stat.birthtime.toLocaleTimeString()}}</dd>\n' +
+            '			<dt>Last Accesed:</dt>\n' +
+            '			<dd>{{info.stat.atime.toLocaleDateString()}} {{info.stat.atime.toLocaleTimeString()}}</dd>\n' +
+            '			<dt>Last Modified:</dt>\n' +
+            '			<dd>{{info.stat.mtime.toLocaleDateString()}} {{info.stat.mtime.toLocaleTimeString()}}</dd>\n' +
+            '		</dl>\n' +
+            '	</div>\n' +
+            '</div>');
+    }]);
+})();
+
+(function(module) {
+    try {
+        module = angular.module('templates.app');
+    } catch (e) {
+        module = angular.module('templates.app', []);
+    }
+    module.run(['$templateCache', function($templateCache) {
+        $templateCache.put('navigator/index.tpl.html',
+            '<div class="window-content" ng-controller="NavigateController as n">\n' +
+            '  <div class="pane-group">\n' +
+            '\n' +
+            '    <div class="pane-sm sidebar">\n' +
+            '    	<nav class="nav-group">\n' +
+            '			<h5 class="nav-group-title">Quick Links</h5>\n' +
+            '			\n' +
+            '			<a class="nav-group-item" ng-class="{ active: currdir == home }" ui-sref="nav({ path: home })">\n' +
+            '				<span class="icon icon-home"></span>\n' +
+            '				{{user}}\n' +
+            '			</a>\n' +
+            '			<a class="nav-group-item" ng-class="{ active: currdir == \'/\' }" ui-sref="nav({ path: \'/\' })">\n' +
+            '		    	<span class="icon icon-code"></span>\n' +
+            '		    	root\n' +
+            '			</a>\n' +
+            '		</nav>\n' +
+            '    </div>\n' +
+            '\n' +
+            '    <div id="navigator-pane" class="pane">\n' +
+            '    	<directory-panel ng-repeat="dir in dirtree" path="dir" navigate="setTree(fileObj)"></directory-panel>\n' +
+            '    </div>\n' +
+            '\n' +
+            '    <file-panel id="file-pane" ng-if="currfile" file="{{currfile}}"></file-panel>\n' +
+            '  </div>\n' +
+            '</div>');
+    }]);
+})();
+
+(function(module) {
+    try {
+        module = angular.module('templates.app');
+    } catch (e) {
+        module = angular.module('templates.app', []);
+    }
+    module.run(['$templateCache', function($templateCache) {
+        $templateCache.put('navigator/panel.tpl.html',
+            '<div class="panel-container">\n' +
+            '	<ul class="list-group folder-panel">\n' +
+            '			<li class="list-group-item file-item" ng-class="{ \'active\': file.active }"\n' +
+            '					ng-repeat="file in content track by $index"\n' +
+            '					ng-click="activateFile($event); navigate({ fileObj: file })"\n' +
+            '					ng-dblclick="open(file)">\n' +
+            '				<div class="media-body">\n' +
+            '					<p>\n' +
+            '						<i ng-if="file.isDir" class="fa fa-folder-o"></i>\n' +
+            '						<i ng-if="!file.isDir" class="fa" ng-class="getFileIcon(file.ext)"></i>\n' +
+            '						{{file.name}}\n' +
+            '					</p>\n' +
+            '				</div>\n' +
+            '			</li>\n' +
+            '		</a>\n' +
+            '	</ul>\n' +
+            '</div>');
+    }]);
+})();
+
+(function(module) {
+    try {
+        module = angular.module('templates.app');
+    } catch (e) {
+        module = angular.module('templates.app', []);
+    }
+    module.run(['$templateCache', function($templateCache) {
         $templateCache.put('header/index.tpl.html',
-            '<header class="toolbar toolbar-header" style="-webkit-app-region: drag">\n' +
+            '<header class="toolbar toolbar-header" ng-controller="ToolbarController as t">\n' +
             '\n' +
             '  <div class="toolbar-actions">\n' +
-            '    <div class="btn-group" style="-webkit-app-region: no-drag">\n' +
-            '      <button class="btn btn-default">\n' +
-            '        <span class="icon icon-home"></span>\n' +
+            '    <div class="btn-group">\n' +
+            '      <button class="btn btn-large btn-default" ng-class="{ disabled: undoList.length == 0 }" onclick="console.log" ng-click="goBack()">\n' +
+            '        <span class="icon icon-left"></span>\n' +
             '      </button>\n' +
-            '      <button class="btn btn-default">\n' +
-            '        <span class="icon icon-folder"></span>\n' +
+            '      <button class="btn btn-large btn-default" ng-click="goUp()">\n' +
+            '        <span class="icon icon-up"></span>\n' +
             '      </button>\n' +
-            '      <button class="btn btn-default active">\n' +
-            '        <span class="icon icon-cloud"></span>\n' +
-            '      </button>\n' +
-            '      <button class="btn btn-default">\n' +
-            '        <span class="icon icon-popup"></span>\n' +
-            '      </button>\n' +
-            '      <button class="btn btn-default">\n' +
-            '        <span class="icon icon-shuffle"></span>\n' +
+            '      <button class="btn btn-large btn-default" ng-class="{ disabled: redoList.length == 0 }" ng-click="goForward()">\n' +
+            '        <span class="icon icon-right"></span>\n' +
             '      </button>\n' +
             '    </div>\n' +
             '\n' +
-            '    <button class="btn btn-default" style="-webkit-app-region: no-drag">\n' +
-            '      <span class="icon icon-home icon-text"></span>\n' +
-            '      Filters\n' +
+            '    <button class="btn btn-large btn-default">\n' +
+            '      <span class="icon icon-folder"></span>\n' +
             '    </button>\n' +
             '\n' +
-            '    <button class="btn btn-default btn-dropdown pull-right">\n' +
-            '      <span class="icon icon-megaphone"></span>\n' +
-            '    </button>\n' +
+            '    <div id="search-field" class="pull-right">\n' +
+            '      <input type="text" class="form-control" placeholder="search">\n' +
+            '    </div>\n' +
             '  </div>\n' +
             '</header>');
     }]);
@@ -37299,40 +37809,6 @@ if (typeof module !== "undefined" && typeof exports !== "undefined" && module.ex
             '  <ng-include src="\'navigator/index.tpl.html\'" include-replace></ng-include>\n' +
             '\n' +
             '  <ng-include src="\'footer/index.tpl.html\'" include-replace></ng-include>\n' +
-            '</div>');
-    }]);
-})();
-
-(function(module) {
-    try {
-        module = angular.module('templates.app');
-    } catch (e) {
-        module = angular.module('templates.app', []);
-    }
-    module.run(['$templateCache', function($templateCache) {
-        $templateCache.put('navigator/index.tpl.html',
-            '<div class="window-content" ng-controller="NavigateController">\n' +
-            '  <div class="pane-group">\n' +
-            '\n' +
-            '    <div class="pane-sm sidebar">\n' +
-            '    	<nav class="nav-group">\n' +
-            '			<h5 class="nav-group-title">Quick Links</h5>\n' +
-            '			\n' +
-            '			<a class="nav-group-item active">\n' +
-            '				<span class="icon icon-home"></span>\n' +
-            '				{{user}}\n' +
-            '			</a>\n' +
-            '			<a class="nav-group-item">\n' +
-            '		    	<span class="icon icon-code"></span>\n' +
-            '		    	root\n' +
-            '			</a>\n' +
-            '		</nav>\n' +
-            '    </div>\n' +
-            '\n' +
-            '    <div class="pane">\n' +
-            '    	\n' +
-            '    </div>\n' +
-            '  </div>\n' +
             '</div>');
     }]);
 })();

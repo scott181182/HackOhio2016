@@ -5,7 +5,9 @@
         .module('browser.app', [
             'ui.router',
             'templates.app',
-            'browser.app.navigator'
+            'browser.app.toolbar',
+            'browser.app.navigator',
+            'browser.app.service.fileservice'
         ])
         .config([ '$stateProvider', '$urlRouterProvider', function($stateProvider, $urlRouterProvider) {
             $urlRouterProvider.otherwise("/nav/")

@@ -145,5 +145,5 @@ gulp.task('watch', function() {
 gulp.task('build:prod', ['prod:js', 'prod:css', 'prod:assets']);
 
 gulp.task('test', function() {
-  console.log(mainBower('**/fonts/*'));
+  console.log(mainBower('**/*.css'));
 })

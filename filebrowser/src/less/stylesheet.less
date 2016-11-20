@@ -1,3 +1,82 @@
+.window-content { overflow: hidden; }
+.nav-group-item { cursor: pointer; }
+
+#navigator-pane
+{
+	max-height: 100%;
+
+	overflow-y: hidden;
+	overflow-x: auto;
+
+	white-space: nowrap;
+
+	.panel-container
+	{
+		height: 100%;
+		display: inline-block;
+
+		overflow-x: hidden;
+		overflow-y: auto;
+
+		border-right: 1px solid #aaa;
+
+		.folder-panel {
+			width: 225px;
+
+			.file-item {
+				font-size: 12px;
+				cursor: pointer;
+
+				&:hover:not(.active) { background-color: Window; }
+				&.active { background-color: AppWorkspace; }
+				&.active.selected { background-color: Highlight; }
+
+
+				* { cursor: pointer; }
+
+				i.fa {
+					font-size: 15px;
+					vertical-align: middle;
+
+					margin-right: 5px;
+					margin-left: 5px;
+				}
+
+				padding: 2px;
+			}
+		}
+	}
+}
+
+#file-pane
+{
+	position: relative;
+	float: right;
+	width: 250px;
+	height: 100%;
+
+	background-color: #f5f5f5;
+
+	.file-container
+	{
+		width: 250px;
+		height: 100%;
+		display: inline-block;
+
+		overflow-x: hidden;
+		overflow-y: auto;
+
+		border-left: 1px solid #888;
+		text-align: center;
+
+		.preview {
+			width: 100%;
+			text-align: center;
+		}
+		.big-icon { font-size: 10em; }
+	}
+}
+
 
 
 /* inject:imports */

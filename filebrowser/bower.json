@@ -15,7 +15,8 @@
   "dependencies": {
     "angular": "^1.5.8",
     "angular-ui-router": "^0.3.2",
-    "photon": "^0.1.2-alpha"
+    "photon": "^0.1.2-alpha",
+    "font-awesome": "fontawesome#^4.7.0"
   },
   "overrides": {
     "photon": {
@@ -25,6 +26,17 @@
         "dist/fonts/photon-entypo.svg",
         "dist/fonts/photon-entypo.ttf",
         "dist/fonts/photon-entypo.woff"
+      ]
+    },
+    "font-awesome": {
+      "main": [
+        "css/font-awesome.css",
+        "fonts/fontawesome-webfont.eot",
+        "fonts/fontawesome-webfont.svg",
+        "fonts/fontawesome-webfont.ttf",
+        "fonts/fontawesome-webfont.woff",
+        "fonts/fontawesome-webfont.woff2",
+        "fonts/FontAwesome.eot"
       ]
     }
   }

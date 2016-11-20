@@ -1,0 +1,18 @@
+<div class="file-container">
+	<div class="preview">
+		<h1 ng-if="!previews.hasKey(info.ext)" class="big-icon"><i class="fa" ng-class="info.icon"></i></h1>
+	</div>
+	<h2>{{info.name}}</h2>
+	<p>{{info.path}}</p>
+
+	<div>
+		<dl>
+			<dt>Created:</dt>
+			<dd>{{info.stat.birthtime.toLocaleDateString()}} {{info.stat.birthtime.toLocaleTimeString()}}</dd>
+			<dt>Last Accessed:</dt>
+			<dd>{{info.stat.atime.toLocaleDateString()}} {{info.stat.atime.toLocaleTimeString()}}</dd>
+			<dt>Last Modified:</dt>
+			<dd>{{info.stat.mtime.toLocaleDateString()}} {{info.stat.mtime.toLocaleTimeString()}}</dd>
+		</dl>
+	</div>
+</div>

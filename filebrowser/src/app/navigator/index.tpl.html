@@ -1,23 +1,25 @@
-<div class="window-content" ng-controller="NavigateController">
+<div class="window-content" ng-controller="NavigateController as n">
   <div class="pane-group">
 
     <div class="pane-sm sidebar">
     	<nav class="nav-group">
 			<h5 class="nav-group-title">Quick Links</h5>
 			
-			<a class="nav-group-item active">
+			<a class="nav-group-item" ng-class="{ active: currdir == home }" ui-sref="nav({ path: home })">
 				<span class="icon icon-home"></span>
 				{{user}}
 			</a>
-			<a class="nav-group-item">
+			<a class="nav-group-item" ng-class="{ active: currdir == '/' }" ui-sref="nav({ path: '/' })">
 		    	<span class="icon icon-code"></span>
 		    	root
 			</a>
 		</nav>
     </div>
 
-    <div class="pane">
-    	
+    <div id="navigator-pane" class="pane">
+    	<directory-panel ng-repeat="dir in dirtree" path="dir" navigate="setTree(fileObj)"></directory-panel>
     </div>
+
+    <file-panel id="file-pane" ng-if="currfile" file="{{currfile}}"></file-panel>
   </div>
 </div>
